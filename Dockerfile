@@ -14,6 +14,9 @@ ARG VERSION
 #  multiple platforms.
 FROM --platform=${BUILDPLATFORM} ${BUILD_IMAGE} AS builder
 
+# Update packages to get latest security patches
+RUN apt-get update && apt-get upgrade -y && apt-get clean && rm -rf /var/lib/apt/lists/*
+
 # Copy sources
 WORKDIR $GOPATH/src/github.com/oauth2-proxy/oauth2-proxy
 

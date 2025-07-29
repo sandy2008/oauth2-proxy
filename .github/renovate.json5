@@ -33,6 +33,17 @@
       ],
       groupName: "golang",
     },
+    {
+      matchDepNames: [
+        "alpine",
+        "gcr.io/distroless/static",
+      ],
+      groupName: "base-images",
+      schedule: [
+        "after 8am on sunday"
+      ],
+      labels: ["security-update"],
+    },
   ],
   customManagers: [
     {
