@@ -1,0 +1,71 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  schedule:
+    # Run security scan daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  vulnerability-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Build Docker image for scanning
+      run: |
+        docker build -t oauth2-proxy:latest \
+          --build-arg BUILD_IMAGE=docker.io/library/golang:1.24.5-bookworm \
+          --build-arg RUNTIME_IMAGE=gcr.io/distroless/static:nonroot-debian12 \
+          --build-arg VERSION=security-scan .
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'oauth2-proxy:latest'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        severity: 'CRITICAL,HIGH,MEDIUM'
+
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+    - name: Run Trivy vulnerability scanner (table format)
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'oauth2-proxy:latest'
+        format: 'table'
+        severity: 'CRITICAL,HIGH'
+        exit-code: '1'
+
+  dependency-scan:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: go.mod
+
+    - name: Run govulncheck
+      run: |
+        go install golang.org/x/vuln/cmd/govulncheck@latest
+        govulncheck ./...
+
+    - name: Run Nancy (OSS Index)
+      run: |
+        go list -json -deps ./... | docker run --rm -i sonatypecommunity/nancy:latest sleuth
